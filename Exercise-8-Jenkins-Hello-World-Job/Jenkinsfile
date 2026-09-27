@@ -1,0 +1,30 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source repository...'
+            }
+        }
+
+        stage('Execute Hello World') {
+            steps {
+                echo 'Executing hello-world script...'
+                sh '''
+                chmod +x Exercise-8-Jenkins-Hello-World-Job/hello-world.sh
+                ./Exercise-8-Jenkins-Hello-World-Job/hello-world.sh
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Hello World job executed successfully!'
+        }
+        failure {
+            echo 'Job failed. Check console output.'
+        }
+    }
+}
