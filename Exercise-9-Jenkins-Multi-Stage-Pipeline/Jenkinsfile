@@ -1,0 +1,78 @@
+pipeline {
+    agent any
+
+    environment {
+        DEPLOY_DIR = "${WORKSPACE}/python-app-deploy"
+        FLASK_APP_DIR = "Exercise-9-Jenkins-Multi-Stage-Pipeline"
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Stage 1: Installing dependencies and preparing build...'
+                sh '''
+                python3 -m pip install --upgrade pip || true
+                python3 -m pip install -r ${FLASK_APP_DIR}/requirements.txt || true
+                '''
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Stage 2: Executing unit tests...'
+                sh '''
+                cd ${FLASK_APP_DIR}
+                python3 -m unittest discover -s .
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Stage 3: Staging application files...'
+                sh '''
+                mkdir -p ${DEPLOY_DIR}
+                cp ${FLASK_APP_DIR}/app.py ${DEPLOY_DIR}/
+                '''
+            }
+        }
+
+        stage('Run Application') {
+            steps {
+                echo 'Stage 4: Starting Flask application daemon...'
+                sh '''
+                nohup python3 ${DEPLOY_DIR}/app.py > ${DEPLOY_DIR}/app.log 2>&1 &
+                echo $! > ${DEPLOY_DIR}/app.pid
+                sleep 2
+                '''
+            }
+        }
+
+        stage('Test Application') {
+            steps {
+                echo 'Stage 5: Validating running application endpoint...'
+                sh '''
+                cd ${FLASK_APP_DIR}
+                python3 test_app.py
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Teardown: Stopping background processes...'
+            sh '''
+            if [ -f ${DEPLOY_DIR}/app.pid ]; then
+                kill $(cat ${DEPLOY_DIR}/app.pid) || true
+            fi
+            '''
+        }
+        success {
+            echo 'Pipeline completed successfully! All stages passed.'
+        }
+        failure {
+            echo 'Pipeline failed. Check stage logs for details.'
+        }
+    }
+}
